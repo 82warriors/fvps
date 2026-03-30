@@ -20,7 +20,7 @@ if uploaded_file:
     # ==============================
     # DATA CLEANING
     # ==============================
-    df.columns = df.columns.str.strip()
+    df.columns = df.columns.map(str).str.strip()
 
     # Example assumptions (adjust if needed)
     if "Start Date" in df.columns and "End Date" in df.columns:
