@@ -55,8 +55,8 @@ try:
     df1.columns = ["Date", "Day", "Leave Type", "Reason", "Late", "Relief"]
     df2.columns = ["Date", "Day", "Leave Type", "Reason", "Late", "Relief"]
 
-    df1["Name"] = "Staff A"
-    df2["Name"] = "Staff B"
+    df1["Name"] = "Amira"
+    df2["Name"] = "Idham"
 
     df = pd.concat([df1, df2], ignore_index=True)
 
