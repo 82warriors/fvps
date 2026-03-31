@@ -24,14 +24,15 @@ def load_data():
             st.error("⚠️ Google Sheet is empty or not accessible")
             st.stop()
 
-    except Exception as e:
+    except Exception:
         st.error("❌ Failed to load Google Sheet")
-        st.write("👉 Check if your sheet is set to 'Anyone with link → Viewer'")
+        st.write("👉 Make sure your Google Sheet is set to:")
+        st.code("Anyone with link → Viewer")
         st.write("👉 Test this link in browser:")
         st.code(url)
         st.stop()
 
-    # Clean columns safely
+    # Clean column names safely
     df_raw.columns = [str(col).strip() for col in df_raw.columns]
 
     return df_raw
@@ -40,7 +41,7 @@ def load_data():
 df_raw = load_data()
 
 # ==============================
-# 🔍 DEBUG (TEMP - REMOVE LATER)
+# 🔍 DEBUG (TEMP)
 # ==============================
 st.write("Columns detected:", df_raw.columns.tolist())
 
@@ -63,9 +64,8 @@ try:
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df = df.dropna(subset=["Date"])
 
-except Exception as e:
-    st.error("⚠️ Data format issue")
-    st.write("Preview of raw data:")
+except Exception:
+    st.error("⚠️ Data format issue - check your Google Sheet layout")
     st.dataframe(df_raw.head(10))
     st.stop()
 
@@ -162,7 +162,7 @@ pivot = df.pivot_table(
 st.dataframe(pivot)
 
 # ==============================
-# 📋 DATA
+# 📋 FULL DATA
 # ==============================
 st.subheader("📋 Full Data")
 st.dataframe(df)
