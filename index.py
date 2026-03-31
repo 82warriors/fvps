@@ -10,6 +10,10 @@ st.title("📊 Attendance Monitoring System")
 # ==============================
 SHEET_ID = "1TZcv_U-U7R9OM98AEMzZ2gvu2Ca6ddqd3yCCxXsTvhE"
 
+# 👇 FIXED STAFF NAMES (STABLE)
+staff1_name = "Amira"
+staff2_name = "Idham"
+
 # ==============================
 # 🔧 LOAD GOOGLE SHEET
 # ==============================
@@ -40,26 +44,25 @@ def load_data():
 df_raw = load_data()
 
 # ==============================
-# 🔥 TRANSFORM DATA (WITH REAL NAMES)
+# 🔥 TRANSFORM DATA (FIXED STRUCTURE)
 # ==============================
 try:
-    # Get names from sheet (B2 & I2)
-    staff1_name = str(df_raw.iloc[1, 1]).strip()
-    staff2_name = str(df_raw.iloc[1, 8]).strip()
+    # Skip top rows (title + name rows)
+    df_data = df_raw.iloc[2:].reset_index(drop=True)
 
-    # Extract 2 tables
-    df1 = df_raw.iloc[:, 0:6].copy()
-    df2 = df_raw.iloc[:, 6:12].copy()
+    # Split into 2 tables
+    df1 = df_data.iloc[:, 0:6].copy()
+    df2 = df_data.iloc[:, 7:13].copy()  # skip empty column
 
     # Rename columns
     df1.columns = ["Date", "Day", "Leave Type", "Reason", "Late", "Relief"]
     df2.columns = ["Date", "Day", "Leave Type", "Reason", "Late", "Relief"]
 
-    # Assign real names
-    df1["Name"] = Amira
-    df2["Name"] = Idham
+    # Assign staff names
+    df1["Name"] = staff1_name
+    df2["Name"] = staff2_name
 
-    # Combine
+    # Combine tables
     df = pd.concat([df1, df2], ignore_index=True)
 
     # Clean data
