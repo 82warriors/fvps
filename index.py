@@ -6,7 +6,7 @@ st.set_page_config(layout="wide")
 st.title("📊 Attendance Monitoring System")
 
 # ==============================
-# 🔧 CONFIG
+# CONFIG
 # ==============================
 SHEET_ID = "1TZcv_U-U7R9OM98AEMzZ2gvu2Ca6ddqd3yCCxXsTvhE"
 
@@ -14,28 +14,19 @@ staff1_name = "Amira"
 staff2_name = "Idham"
 
 # ==============================
-# 🔧 LOAD DATA
+# LOAD DATA
 # ==============================
 @st.cache_data
 def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-
-    try:
-        df_raw = pd.read_csv(url)
-        if df_raw.empty:
-            st.error("⚠️ Google Sheet empty")
-            st.stop()
-    except:
-        st.error("❌ Cannot load Google Sheet")
-        st.stop()
-
+    df_raw = pd.read_csv(url)
     df_raw.columns = [str(col).strip() for col in df_raw.columns]
     return df_raw
 
 df_raw = load_data()
 
 # ==============================
-# 🔥 TRANSFORM DATA
+# TRANSFORM DATA
 # ==============================
 df_data = df_raw.iloc[2:].reset_index(drop=True)
 
@@ -57,7 +48,26 @@ df["Name"] = df["Name"].astype(str).str.strip()
 df["Leave Type"] = df["Leave Type"].astype(str).str.strip()
 
 # ==============================
-# 🔎 SIDEBAR FILTERS
+# DATE FILTER (NEW 🔥)
+# ==============================
+st.sidebar.header("📅 Date Filter")
+
+min_date = df["Date"].min()
+max_date = df["Date"].max()
+
+date_range = st.sidebar.date_input(
+    "Select Date Range",
+    [min_date, max_date],
+    min_value=min_date,
+    max_value=max_date
+)
+
+if len(date_range) == 2:
+    start_date, end_date = date_range
+    df = df[(df["Date"] >= pd.to_datetime(start_date)) & (df["Date"] <= pd.to_datetime(end_date))]
+
+# ==============================
+# OTHER FILTERS
 # ==============================
 st.sidebar.header("🔎 Filters")
 
@@ -71,23 +81,22 @@ df = df[df["Name"].isin(selected_staff)]
 df = df[df["Leave Type"].isin(selected_leave)]
 
 # ==============================
-# 🧭 TABS UI
+# TABS
 # ==============================
 tab1, tab2, tab3, tab4 = st.tabs([
     "📊 Dashboard",
     "📅 Monitoring",
     "📈 Trends",
-    "📋 Data"
+    "📋 Data Explorer"
 ])
 
 # ==============================
-# 📊 DASHBOARD
+# DASHBOARD
 # ==============================
 with tab1:
     st.subheader("📊 Overview")
 
     col1, col2, col3 = st.columns(3)
-
     col1.metric("Total Records", len(df))
     col2.metric("Total Staff", df["Name"].nunique())
     col3.metric("Leave Types", df["Leave Type"].nunique())
@@ -99,11 +108,27 @@ with tab1:
 
     fig = px.bar(leave, x="Leave Type", y="Count", text="Count")
     fig.update_traces(textposition="outside")
-
     st.plotly_chart(fig, use_container_width=True)
 
+    # ==============================
+    # COMPARISON TABLE
+    # ==============================
+    st.markdown("### 📊 Staff Comparison")
+
+    total = df.groupby("Name").size()
+    leave_breakdown = df.groupby(["Name", "Leave Type"]).size().unstack(fill_value=0)
+
+    comparison = pd.DataFrame({
+        "Total Absences": total
+    }).join(leave_breakdown).fillna(0)
+
+    comparison = comparison.reset_index()
+    comparison = comparison.sort_values("Total Absences", ascending=False)
+
+    st.dataframe(comparison, use_container_width=True)
+
 # ==============================
-# 📅 MONITORING
+# MONITORING
 # ==============================
 with tab2:
     st.subheader("📅 Today's Absentees")
@@ -120,13 +145,12 @@ with tab2:
 
     alert = df["Name"].value_counts().reset_index()
     alert.columns = ["Name", "Count"]
-
     alert = alert[alert["Count"] >= 3]
 
     st.dataframe(alert)
 
 # ==============================
-# 📈 TRENDS
+# TRENDS
 # ==============================
 with tab3:
     st.subheader("📈 Trends")
@@ -136,19 +160,19 @@ with tab3:
     df["Year-Week"] = df["Year"].astype(str) + "-W" + df["Week"].astype(str)
     df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
-    # DAILY
+    # Daily
     st.markdown("### 📅 Daily")
     daily = df.groupby("Date").size().reset_index(name="Count")
     st.plotly_chart(px.line(daily, x="Date", y="Count", markers=True), use_container_width=True)
 
-    # WEEKLY
+    # Weekly
     st.markdown("### 📅 Weekly")
     weekly = df.groupby("Year-Week").size().reset_index(name="Count")
     fig_w = px.bar(weekly, x="Year-Week", y="Count", text="Count")
     fig_w.update_traces(textposition="outside")
     st.plotly_chart(fig_w, use_container_width=True)
 
-    # MONTHLY
+    # Monthly
     st.markdown("### 📆 Monthly")
     monthly = df.groupby("Month").size().reset_index(name="Count")
     fig_m = px.bar(monthly, x="Month", y="Count", text="Count")
@@ -156,8 +180,26 @@ with tab3:
     st.plotly_chart(fig_m, use_container_width=True)
 
 # ==============================
-# 📋 DATA
+# DATA EXPLORER (FORMATTED + STYLED)
 # ==============================
 with tab4:
     st.subheader("📋 Data Explorer")
-    st.dataframe(df)
+
+    df_display = df.copy()
+
+    # Format date
+    df_display["Date"] = df_display["Date"].dt.strftime("%d %b %Y")
+
+    # Styling function
+    def highlight_leave(val):
+        if val == "ML":
+            return "background-color: #ffcccc"
+        elif val == "VL":
+            return "background-color: #cce5ff"
+        elif val == "UL":
+            return "background-color: #fff3cd"
+        return ""
+
+    styled_df = df_display.style.applymap(highlight_leave, subset=["Leave Type"])
+
+    st.dataframe(styled_df, use_container_width=True)
