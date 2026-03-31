@@ -3,25 +3,46 @@ import pandas as pd
 import plotly.express as px
 
 st.set_page_config(layout="wide")
-
 st.title("📊 Attendance Monitoring System")
 
 # ==============================
-# 🔧 LOAD GOOGLE SHEET
+# 🔧 CONFIG
 # ==============================
 SHEET_ID = "1TZcv_U-U7R9OM98AEMzZ2gvu2Ca6ddqd3yCCxXsTvhE"
 
+# ==============================
+# 🔧 LOAD GOOGLE SHEET (SAFE)
+# ==============================
 @st.cache_data
 def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
-    df_raw = pd.read_csv(url)
 
-    # Clean column names
+    try:
+        df_raw = pd.read_csv(url)
+
+        if df_raw.empty:
+            st.error("⚠️ Google Sheet is empty or not accessible")
+            st.stop()
+
+    except Exception as e:
+        st.error("❌ Failed to load Google Sheet")
+        st.write("👉 Check if your sheet is set to 'Anyone with link → Viewer'")
+        st.write("👉 Test this link in browser:")
+        st.code(url)
+        st.stop()
+
+    # Clean columns safely
     df_raw.columns = [str(col).strip() for col in df_raw.columns]
 
     return df_raw
 
+
 df_raw = load_data()
+
+# ==============================
+# 🔍 DEBUG (TEMP - REMOVE LATER)
+# ==============================
+st.write("Columns detected:", df_raw.columns.tolist())
 
 # ==============================
 # 🔥 TRANSFORM 2 TABLES → 1 TABLE
@@ -43,12 +64,13 @@ try:
     df = df.dropna(subset=["Date"])
 
 except Exception as e:
-    st.error("⚠️ Data format issue. Check your Google Sheet structure.")
-    st.write(df_raw.head())
+    st.error("⚠️ Data format issue")
+    st.write("Preview of raw data:")
+    st.dataframe(df_raw.head(10))
     st.stop()
 
 # ==============================
-# 🔎 SIDEBAR FILTERS
+# 🔎 FILTERS
 # ==============================
 st.sidebar.header("🔎 Filters")
 
@@ -68,13 +90,13 @@ df = df[df["Name"].isin(names)]
 df = df[df["Leave Type"].isin(leave_types)]
 
 # ==============================
-# 📊 KPI DASHBOARD
+# 📊 KPI
 # ==============================
 col1, col2, col3 = st.columns(3)
 
 col1.metric("Total Records", len(df))
 col2.metric("Total Staff", df["Name"].nunique())
-col3.metric("Total Leave Types", df["Leave Type"].nunique())
+col3.metric("Leave Types", df["Leave Type"].nunique())
 
 # ==============================
 # 📅 TODAY MONITOR
@@ -90,7 +112,7 @@ else:
     st.dataframe(today_df)
 
 # ==============================
-# 📈 TREND ANALYSIS
+# 📈 TREND
 # ==============================
 st.subheader("📈 Absence Trend")
 
@@ -100,7 +122,7 @@ fig1 = px.line(trend, x="Date", y="Count", title="Daily Absence Trend")
 st.plotly_chart(fig1, use_container_width=True)
 
 # ==============================
-# 📊 LEAVE TYPE ANALYSIS
+# 📊 LEAVE TYPE
 # ==============================
 st.subheader("📊 Leave Type Distribution")
 
@@ -111,7 +133,7 @@ fig2 = px.bar(leave, x="Leave Type", y="Count")
 st.plotly_chart(fig2, use_container_width=True)
 
 # ==============================
-# ⚠️ FREQUENT ABSENTEES
+# ⚠️ ALERT SYSTEM
 # ==============================
 st.subheader("⚠️ Frequent Absentees")
 
@@ -123,7 +145,7 @@ alert = alert[alert["Absence Count"] >= 3]
 st.dataframe(alert)
 
 # ==============================
-# 📅 HEATMAP (PATTERN)
+# 📅 HEATMAP
 # ==============================
 st.subheader("📅 Absence Pattern")
 
@@ -140,8 +162,7 @@ pivot = df.pivot_table(
 st.dataframe(pivot)
 
 # ==============================
-# 📋 FULL DATA
+# 📋 DATA
 # ==============================
 st.subheader("📋 Full Data")
-
 st.dataframe(df)
