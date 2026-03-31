@@ -11,7 +11,7 @@ st.title("📊 Attendance Monitoring System")
 SHEET_ID = "1TZcv_U-U7R9OM98AEMzZ2gvu2Ca6ddqd3yCCxXsTvhE"
 
 # ==============================
-# 🔧 LOAD GOOGLE SHEET (SAFE)
+# 🔧 LOAD GOOGLE SHEET
 # ==============================
 @st.cache_data
 def load_data():
@@ -26,13 +26,12 @@ def load_data():
 
     except Exception:
         st.error("❌ Failed to load Google Sheet")
-        st.write("👉 Make sure your Google Sheet is set to:")
+        st.write("👉 Make sure sharing is set to:")
         st.code("Anyone with link → Viewer")
         st.write("👉 Test this link in browser:")
         st.code(url)
         st.stop()
 
-    # Clean column names safely
     df_raw.columns = [str(col).strip() for col in df_raw.columns]
 
     return df_raw
@@ -41,28 +40,34 @@ def load_data():
 df_raw = load_data()
 
 # ==============================
-# 🔍 DEBUG (TEMP)
-# ==============================
-st.write("Columns detected:", df_raw.columns.tolist())
-
-# ==============================
-# 🔥 TRANSFORM 2 TABLES → 1 TABLE
+# 🔥 TRANSFORM DATA (WITH REAL NAMES)
 # ==============================
 try:
+    # Get names from sheet (B2 & I2)
+    staff1_name = str(df_raw.iloc[1, 1]).strip()
+    staff2_name = str(df_raw.iloc[1, 8]).strip()
+
+    # Extract 2 tables
     df1 = df_raw.iloc[:, 0:6].copy()
     df2 = df_raw.iloc[:, 6:12].copy()
 
+    # Rename columns
     df1.columns = ["Date", "Day", "Leave Type", "Reason", "Late", "Relief"]
     df2.columns = ["Date", "Day", "Leave Type", "Reason", "Late", "Relief"]
 
-    df1["Name"] = "Amira"
-    df2["Name"] = "Idham"
+    # Assign real names
+    df1["Name"] = Amira
+    df2["Name"] = Idham
 
+    # Combine
     df = pd.concat([df1, df2], ignore_index=True)
 
     # Clean data
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
     df = df.dropna(subset=["Date"])
+
+    df["Name"] = df["Name"].astype(str).str.strip()
+    df["Leave Type"] = df["Leave Type"].astype(str).str.strip()
 
 except Exception:
     st.error("⚠️ Data format issue - check your Google Sheet layout")
@@ -74,20 +79,23 @@ except Exception:
 # ==============================
 st.sidebar.header("🔎 Filters")
 
-names = st.sidebar.multiselect(
+staff_list = sorted(df["Name"].dropna().unique())
+leave_list = sorted(df["Leave Type"].dropna().unique())
+
+selected_staff = st.sidebar.multiselect(
     "Staff",
-    options=df["Name"].unique(),
-    default=df["Name"].unique()
+    options=staff_list,
+    default=staff_list
 )
 
-leave_types = st.sidebar.multiselect(
+selected_leave = st.sidebar.multiselect(
     "Leave Type",
-    options=df["Leave Type"].dropna().unique(),
-    default=df["Leave Type"].dropna().unique()
+    options=leave_list,
+    default=leave_list
 )
 
-df = df[df["Name"].isin(names)]
-df = df[df["Leave Type"].isin(leave_types)]
+df = df[df["Name"].isin(selected_staff)]
+df = df[df["Leave Type"].isin(selected_leave)]
 
 # ==============================
 # 📊 KPI
