@@ -104,24 +104,13 @@ with tab1:
     col2.metric("Total Staff", df["Name"].nunique())
     col3.metric("Leave Types", df["Leave Type"].nunique())
 
-    # ==============================
-    # 📊 LEAVE DISTRIBUTION (DYNAMIC)
-    # ==============================
     st.markdown("### 📊 Leave Distribution")
 
-    num_staff = df["Name"].nunique()
-
-    if num_staff == 1:
+    if df["Name"].nunique() == 1:
         leave = df["Leave Type"].value_counts().reset_index()
         leave.columns = ["Leave Type", "Count"]
 
-        fig = px.bar(
-            leave,
-            x="Leave Type",
-            y="Count",
-            text="Count",
-            color="Leave Type"
-        )
+        fig = px.bar(leave, x="Leave Type", y="Count", text="Count", color="Leave Type")
 
     else:
         leave = df.groupby(["Leave Type", "Name"]).size().reset_index(name="Count")
@@ -138,24 +127,18 @@ with tab1:
     fig.update_traces(textposition="outside")
     st.plotly_chart(fig, use_container_width=True)
 
-    # ==============================
-    # 📊 STAFF COMPARISON
-    # ==============================
     st.markdown("### 📊 Staff Comparison")
 
     total = df.groupby("Name").size()
     leave_breakdown = df.groupby(["Name", "Leave Type"]).size().unstack(fill_value=0)
 
-    comparison = pd.DataFrame({
-        "Total Absences": total
-    }).join(leave_breakdown).fillna(0)
-
+    comparison = pd.DataFrame({"Total Absences": total}).join(leave_breakdown).fillna(0)
     comparison = comparison.reset_index().sort_values("Total Absences", ascending=False)
 
     st.dataframe(comparison, use_container_width=True)
 
 # ==============================
-# MONITORING (UPGRADED)
+# MONITORING
 # ==============================
 with tab2:
     st.subheader("📅 Monitoring")
@@ -168,7 +151,6 @@ with tab2:
 
     df_year = df_monitor[df_monitor["Year"] == selected_year].copy()
 
-    # Month order
     month_order = [
         "January","February","March","April","May","June",
         "July","August","September","October","November","December"
@@ -195,7 +177,6 @@ with tab2:
     fig_month.update_traces(textposition="outside")
     st.plotly_chart(fig_month, use_container_width=True)
 
-    # Today
     st.markdown("### 📅 Today's Absentees")
 
     today = pd.Timestamp.today().normalize()
@@ -206,7 +187,6 @@ with tab2:
     else:
         st.dataframe(today_df)
 
-    # Alerts
     st.markdown("### ⚠️ Frequent Absentees")
 
     alert = df["Name"].value_counts().reset_index()
@@ -216,27 +196,25 @@ with tab2:
     st.dataframe(alert)
 
 # ==============================
-# TRENDS (UNCHANGED - GOOD)
+# TRENDS
 # ==============================
 with tab3:
     st.subheader("📈 Pair Comparison Trends")
 
-    df["Week"] = df["Date"].dt.to_period("W").astype(str)
-    df["Month"] = df["Date"].dt.to_period("M").astype(str)
+    df_trend = df.copy()
+    df_trend["Week"] = df_trend["Date"].dt.to_period("W").astype(str)
+    df_trend["Month"] = df_trend["Date"].dt.to_period("M").astype(str)
 
-    st.markdown("### 📅 Daily Pair Comparison")
-    daily = df.groupby(["Date", "Name"]).size().reset_index(name="Count")
+    st.markdown("### 📅 Daily")
+    daily = df_trend.groupby(["Date", "Name"]).size().reset_index(name="Count")
     st.line_chart(daily.pivot(index="Date", columns="Name", values="Count").fillna(0))
 
-    st.markdown("### 📊 Daily ECDF")
-    st.plotly_chart(px.ecdf(daily, x="Count", color="Name"), use_container_width=True)
-
-    st.markdown("### 📅 Weekly Pair")
-    weekly = df.groupby(["Week", "Name"]).size().reset_index(name="Count")
+    st.markdown("### 📅 Weekly")
+    weekly = df_trend.groupby(["Week", "Name"]).size().reset_index(name="Count")
     st.bar_chart(weekly.pivot(index="Week", columns="Name", values="Count").fillna(0))
 
-    st.markdown("### 📆 Monthly Pair")
-    monthly = df.groupby(["Month", "Name"]).size().reset_index(name="Count")
+    st.markdown("### 📆 Monthly")
+    monthly = df_trend.groupby(["Month", "Name"]).size().reset_index(name="Count")
     st.bar_chart(monthly.pivot(index="Month", columns="Name", values="Count").fillna(0))
 
 # ==============================
@@ -259,66 +237,59 @@ with tab4:
 
     styled_df = df_display.style.map(highlight_leave, subset=["Leave Type"])
 
-  
+    st.dataframe(styled_df, use_container_width=True)
 
 # ==============================
-# 🤖 FORECAST
+# FORECAST
 # ==============================
 with tab5:
     st.subheader("🤖 Absence Forecast")
 
-    # Prepare monthly data
     df_forecast = df.copy()
-    df_forecast["Month"] = df_forecast["Date"].dt.to_period("M").astype(str)
+    df_forecast["Month"] = df_forecast["Date"].dt.to_period("M")
 
     monthly = df_forecast.groupby("Month").size().reset_index(name="Count")
+    monthly["Month"] = monthly["Month"].dt.to_timestamp()
 
-    # Convert month to numeric index
     monthly["t"] = np.arange(len(monthly))
 
-    # Train model
     X = monthly[["t"]]
     y = monthly["Count"]
 
     model = LinearRegression()
     model.fit(X, y)
 
-    # Forecast next 4 periods
     future_steps = 4
     future_t = np.arange(len(monthly), len(monthly) + future_steps)
 
     future_pred = model.predict(future_t.reshape(-1, 1))
 
-    # Create future dataframe
+    last_date = monthly["Month"].iloc[-1]
+    future_dates = pd.date_range(last_date, periods=future_steps + 1, freq="M")[1:]
+
     future_df = pd.DataFrame({
-        "t": future_t,
-        "Forecast": future_pred
+        "Month": future_dates,
+        "Value": future_pred,
+        "Type": "Forecast"
     })
 
-    # Combine actual + forecast
-    monthly["Type"] = "Actual"
     monthly.rename(columns={"Count": "Value"}, inplace=True)
-
-    future_df["Type"] = "Forecast"
-    future_df.rename(columns={"Forecast": "Value"}, inplace=True)
+    monthly["Type"] = "Actual"
 
     combined = pd.concat([
-        monthly[["t", "Value", "Type"]],
+        monthly[["Month", "Value", "Type"]],
         future_df
     ])
 
-    # Plot
     fig = px.line(
         combined,
-        x="t",
+        x="Month",
         y="Value",
         color="Type",
         markers=True,
-        title="Absence Forecast (Next 4 Periods)"
+        title="Absence Forecast (Next 4 Months)"
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    st.info("📌 Forecast is based on historical trend (linear model)")
-
-    st.dataframe(styled_df, use_container_width=True)
+    st.info("📌 Forecast uses linear trend (basic prediction)")
