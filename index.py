@@ -101,15 +101,43 @@ with tab1:
     col2.metric("Total Staff", df["Name"].nunique())
     col3.metric("Leave Types", df["Leave Type"].nunique())
 
+    # ==============================
+    # 📊 LEAVE DISTRIBUTION (DYNAMIC)
+    # ==============================
     st.markdown("### 📊 Leave Distribution")
 
-    leave = df["Leave Type"].value_counts().reset_index()
-    leave.columns = ["Leave Type", "Count"]
+    num_staff = df["Name"].nunique()
 
-    fig = px.bar(leave, x="Leave Type", y="Count", text="Count", color="Leave Type")
+    if num_staff == 1:
+        leave = df["Leave Type"].value_counts().reset_index()
+        leave.columns = ["Leave Type", "Count"]
+
+        fig = px.bar(
+            leave,
+            x="Leave Type",
+            y="Count",
+            text="Count",
+            color="Leave Type"
+        )
+
+    else:
+        leave = df.groupby(["Leave Type", "Name"]).size().reset_index(name="Count")
+
+        fig = px.bar(
+            leave,
+            x="Leave Type",
+            y="Count",
+            color="Name",
+            barmode="group",
+            text="Count"
+        )
+
     fig.update_traces(textposition="outside")
     st.plotly_chart(fig, use_container_width=True)
 
+    # ==============================
+    # 📊 STAFF COMPARISON
+    # ==============================
     st.markdown("### 📊 Staff Comparison")
 
     total = df.groupby("Name").size()
@@ -119,16 +147,53 @@ with tab1:
         "Total Absences": total
     }).join(leave_breakdown).fillna(0)
 
-    comparison = comparison.reset_index()
-    comparison = comparison.sort_values("Total Absences", ascending=False)
+    comparison = comparison.reset_index().sort_values("Total Absences", ascending=False)
 
     st.dataframe(comparison, use_container_width=True)
 
 # ==============================
-# MONITORING
+# MONITORING (UPGRADED)
 # ==============================
 with tab2:
-    st.subheader("📅 Today's Absentees")
+    st.subheader("📅 Monitoring")
+
+    df_monitor = df.copy()
+    df_monitor["Year"] = df_monitor["Date"].dt.year
+
+    years = sorted(df_monitor["Year"].unique(), reverse=True)
+    selected_year = st.selectbox("Select Year", years)
+
+    df_year = df_monitor[df_monitor["Year"] == selected_year].copy()
+
+    # Month order
+    month_order = [
+        "January","February","March","April","May","June",
+        "July","August","September","October","November","December"
+    ]
+
+    df_year["Month"] = df_year["Date"].dt.month_name()
+
+    monthly = df_year.groupby(["Month", "Name"]).size().reset_index(name="Count")
+
+    monthly["Month"] = pd.Categorical(monthly["Month"], categories=month_order, ordered=True)
+    monthly = monthly.sort_values("Month")
+
+    st.markdown("### 📆 Monthly Summary")
+
+    fig_month = px.bar(
+        monthly,
+        x="Month",
+        y="Count",
+        color="Name",
+        barmode="group",
+        text="Count"
+    )
+
+    fig_month.update_traces(textposition="outside")
+    st.plotly_chart(fig_month, use_container_width=True)
+
+    # Today
+    st.markdown("### 📅 Today's Absentees")
 
     today = pd.Timestamp.today().normalize()
     today_df = df[df["Date"] == today]
@@ -138,7 +203,8 @@ with tab2:
     else:
         st.dataframe(today_df)
 
-    st.subheader("⚠️ Frequent Absentees")
+    # Alerts
+    st.markdown("### ⚠️ Frequent Absentees")
 
     alert = df["Name"].value_counts().reset_index()
     alert.columns = ["Name", "Count"]
@@ -147,85 +213,38 @@ with tab2:
     st.dataframe(alert)
 
 # ==============================
-# TRENDS
+# TRENDS (UNCHANGED - GOOD)
 # ==============================
 with tab3:
     st.subheader("📈 Pair Comparison Trends")
 
-    # ==============================
-    # PREP DATA
-    # ==============================
     df["Week"] = df["Date"].dt.to_period("W").astype(str)
     df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
-    # ==============================
-    # 📅 DAILY PAIR (LINE)
-    # ==============================
     st.markdown("### 📅 Daily Pair Comparison")
-
     daily = df.groupby(["Date", "Name"]).size().reset_index(name="Count")
+    st.line_chart(daily.pivot(index="Date", columns="Name", values="Count").fillna(0))
 
-    daily_pivot = daily.pivot(index="Date", columns="Name", values="Count").fillna(0)
+    st.markdown("### 📊 Daily ECDF")
+    st.plotly_chart(px.ecdf(daily, x="Count", color="Name"), use_container_width=True)
 
-    st.line_chart(daily_pivot)
-
-    # ==============================
-    # 📊 DAILY ECDF
-    # ==============================
-    st.markdown("### 📊 Daily Distribution (ECDF)")
-
-    fig_ecdf = px.ecdf(daily, x="Count", color="Name")
-    st.plotly_chart(fig_ecdf, use_container_width=True)
-
-    # ==============================
-    # 📅 WEEKLY PAIR
-    # ==============================
-    st.markdown("### 📅 Weekly Pair Comparison")
-
+    st.markdown("### 📅 Weekly Pair")
     weekly = df.groupby(["Week", "Name"]).size().reset_index(name="Count")
+    st.bar_chart(weekly.pivot(index="Week", columns="Name", values="Count").fillna(0))
 
-    weekly_pivot = weekly.pivot(index="Week", columns="Name", values="Count").fillna(0)
-
-    st.bar_chart(weekly_pivot)
-
-    # ==============================
-    # 📊 WEEKLY ECDF
-    # ==============================
-    st.markdown("### 📊 Weekly Distribution (ECDF)")
-
-    fig_weekly_ecdf = px.ecdf(weekly, x="Count", color="Name")
-    st.plotly_chart(fig_weekly_ecdf, use_container_width=True)
-
-    # ==============================
-    # 📆 MONTHLY PAIR
-    # ==============================
-    st.markdown("### 📆 Monthly Pair Comparison")
-
+    st.markdown("### 📆 Monthly Pair")
     monthly = df.groupby(["Month", "Name"]).size().reset_index(name="Count")
-
-    monthly_pivot = monthly.pivot(index="Month", columns="Name", values="Count").fillna(0)
-
-    st.bar_chart(monthly_pivot)
-
-    # ==============================
-    # 📊 MONTHLY ECDF
-    # ==============================
-    st.markdown("### 📊 Monthly Distribution (ECDF)")
-
-    fig_monthly_ecdf = px.ecdf(monthly, x="Count", color="Name")
-    st.plotly_chart(fig_monthly_ecdf, use_container_width=True)
+    st.bar_chart(monthly.pivot(index="Month", columns="Name", values="Count").fillna(0))
 
 # ==============================
-# DATA EXPLORER (WITH STYLING)
+# DATA EXPLORER
 # ==============================
 with tab4:
     st.subheader("📋 Data Explorer")
 
-    # Format date
     df_display = df.copy()
     df_display["Date"] = df_display["Date"].dt.strftime("%d %b %Y")
 
-    # Styling function
     def highlight_leave(val):
         if val == "ML":
             return "background-color: #ffcccc"
@@ -235,7 +254,6 @@ with tab4:
             return "background-color: #fff3cd"
         return ""
 
-    # Apply styling
     styled_df = df_display.style.map(highlight_leave, subset=["Leave Type"])
 
     st.dataframe(styled_df, use_container_width=True)
