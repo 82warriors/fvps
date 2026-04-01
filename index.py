@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from sklearn.linear_model import LinearRegression
+import numpy as np
 
 st.set_page_config(layout="wide")
 st.title("📊 Attendance Monitoring System")
@@ -83,11 +85,12 @@ df = df[df["Leave Type"].isin(selected_leave)]
 # ==============================
 # TABS
 # ==============================
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Dashboard",
     "📅 Monitoring",
     "📈 Trends",
-    "📋 Data Explorer"
+    "📋 Data Explorer",
+    "🤖 Forecast"
 ])
 
 # ==============================
@@ -257,3 +260,63 @@ with tab4:
     styled_df = df_display.style.map(highlight_leave, subset=["Leave Type"])
 
     st.dataframe(styled_df, use_container_width=True)
+
+# ==============================
+# 🤖 FORECAST
+# ==============================
+with tab5:
+    st.subheader("🤖 Absence Forecast")
+
+    # Prepare monthly data
+    df_forecast = df.copy()
+    df_forecast["Month"] = df_forecast["Date"].dt.to_period("M").astype(str)
+
+    monthly = df_forecast.groupby("Month").size().reset_index(name="Count")
+
+    # Convert month to numeric index
+    monthly["t"] = np.arange(len(monthly))
+
+    # Train model
+    X = monthly[["t"]]
+    y = monthly["Count"]
+
+    model = LinearRegression()
+    model.fit(X, y)
+
+    # Forecast next 4 periods
+    future_steps = 4
+    future_t = np.arange(len(monthly), len(monthly) + future_steps)
+
+    future_pred = model.predict(future_t.reshape(-1, 1))
+
+    # Create future dataframe
+    future_df = pd.DataFrame({
+        "t": future_t,
+        "Forecast": future_pred
+    })
+
+    # Combine actual + forecast
+    monthly["Type"] = "Actual"
+    monthly.rename(columns={"Count": "Value"}, inplace=True)
+
+    future_df["Type"] = "Forecast"
+    future_df.rename(columns={"Forecast": "Value"}, inplace=True)
+
+    combined = pd.concat([
+        monthly[["t", "Value", "Type"]],
+        future_df
+    ])
+
+    # Plot
+    fig = px.line(
+        combined,
+        x="t",
+        y="Value",
+        color="Type",
+        markers=True,
+        title="Absence Forecast (Next 4 Periods)"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.info("📌 Forecast is based on historical trend (linear model)")
