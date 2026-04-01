@@ -259,7 +259,7 @@ with tab4:
 
     styled_df = df_display.style.map(highlight_leave, subset=["Leave Type"])
 
-    st.dataframe(styled_df, use_container_width=True)
+  
 
 # ==============================
 # 🤖 FORECAST
@@ -320,3 +320,5 @@ with tab5:
     st.plotly_chart(fig, use_container_width=True)
 
     st.info("📌 Forecast is based on historical trend (linear model)")
+
+    st.dataframe(styled_df, use_container_width=True)
