@@ -48,7 +48,7 @@ df["Name"] = df["Name"].astype(str).str.strip()
 df["Leave Type"] = df["Leave Type"].astype(str).str.strip()
 
 # ==============================
-# DATE FILTER (NEW 🔥)
+# DATE FILTER
 # ==============================
 st.sidebar.header("📅 Date Filter")
 
@@ -106,13 +106,10 @@ with tab1:
     leave = df["Leave Type"].value_counts().reset_index()
     leave.columns = ["Leave Type", "Count"]
 
-    fig = px.bar(leave, x="Leave Type", y="Count", text="Count")
+    fig = px.bar(leave, x="Leave Type", y="Count", text="Count", color="Leave Type")
     fig.update_traces(textposition="outside")
     st.plotly_chart(fig, use_container_width=True)
 
-    # ==============================
-    # COMPARISON TABLE
-    # ==============================
     st.markdown("### 📊 Staff Comparison")
 
     total = df.groupby("Name").size()
@@ -160,19 +157,16 @@ with tab3:
     df["Year-Week"] = df["Year"].astype(str) + "-W" + df["Week"].astype(str)
     df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
-    # Daily
     st.markdown("### 📅 Daily")
     daily = df.groupby("Date").size().reset_index(name="Count")
     st.plotly_chart(px.line(daily, x="Date", y="Count", markers=True), use_container_width=True)
 
-    # Weekly
     st.markdown("### 📅 Weekly")
     weekly = df.groupby("Year-Week").size().reset_index(name="Count")
     fig_w = px.bar(weekly, x="Year-Week", y="Count", text="Count")
     fig_w.update_traces(textposition="outside")
     st.plotly_chart(fig_w, use_container_width=True)
 
-    # Monthly
     st.markdown("### 📆 Monthly")
     monthly = df.groupby("Month").size().reset_index(name="Count")
     fig_m = px.bar(monthly, x="Month", y="Count", text="Count")
@@ -180,14 +174,13 @@ with tab3:
     st.plotly_chart(fig_m, use_container_width=True)
 
 # ==============================
-# DATA EXPLORER (FORMATTED + STYLED)
+# DATA EXPLORER (WITH STYLING)
 # ==============================
 with tab4:
     st.subheader("📋 Data Explorer")
 
-    df_display = df.copy()
-
     # Format date
+    df_display = df.copy()
     df_display["Date"] = df_display["Date"].dt.strftime("%d %b %Y")
 
     # Styling function
@@ -200,6 +193,7 @@ with tab4:
             return "background-color: #fff3cd"
         return ""
 
-    styled_df = df_display.style.applymap(highlight_leave, subset=["Leave Type"])
+    # Apply styling
+    styled_df = df_display.style.map(highlight_leave, subset=["Leave Type"])
 
     st.dataframe(styled_df, use_container_width=True)
