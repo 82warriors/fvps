@@ -265,7 +265,7 @@ with tab5:
     future_pred = model.predict(future_t.reshape(-1, 1))
 
     last_date = monthly["Month"].iloc[-1]
-    future_dates = pd.date_range(last_date, periods=future_steps + 1, freq="M")[1:]
+    future_dates = pd.date_range(start=last_date, periods=future_steps + 1, freq="MS")[1:]
 
     future_df = pd.DataFrame({
         "Month": future_dates,
