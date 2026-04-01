@@ -150,7 +150,7 @@ with tab2:
 # TRENDS
 # ==============================
 with tab3:
-    st.subheader("📈 Trends Comparison")
+    st.subheader("📈 Pair Comparison Trends")
 
     # ==============================
     # PREP DATA
@@ -159,99 +159,60 @@ with tab3:
     df["Month"] = df["Date"].dt.to_period("M").astype(str)
 
     # ==============================
-    # 📅 DAILY (LINE COMPARISON)
+    # 📅 DAILY PAIR (LINE)
     # ==============================
-    st.markdown("### 📅 Daily Comparison")
+    st.markdown("### 📅 Daily Pair Comparison")
 
     daily = df.groupby(["Date", "Name"]).size().reset_index(name="Count")
 
-    fig_daily = px.line(
-        daily,
-        x="Date",
-        y="Count",
-        color="Name",
-        markers=True
-    )
+    daily_pivot = daily.pivot(index="Date", columns="Name", values="Count").fillna(0)
 
-    st.plotly_chart(fig_daily, use_container_width=True)
+    st.line_chart(daily_pivot)
 
     # ==============================
-    # 📊 DAILY ECDF (DISTRIBUTION)
+    # 📊 DAILY ECDF
     # ==============================
     st.markdown("### 📊 Daily Distribution (ECDF)")
 
-    fig_ecdf = px.ecdf(
-        daily,
-        x="Count",
-        color="Name"
-    )
-
+    fig_ecdf = px.ecdf(daily, x="Count", color="Name")
     st.plotly_chart(fig_ecdf, use_container_width=True)
 
     # ==============================
-    # 📅 WEEKLY COMPARISON
+    # 📅 WEEKLY PAIR
     # ==============================
-    st.markdown("### 📅 Weekly Comparison")
+    st.markdown("### 📅 Weekly Pair Comparison")
 
     weekly = df.groupby(["Week", "Name"]).size().reset_index(name="Count")
 
-    fig_weekly = px.bar(
-        weekly,
-        x="Week",
-        y="Count",
-        color="Name",
-        barmode="group",
-        text="Count"
-    )
+    weekly_pivot = weekly.pivot(index="Week", columns="Name", values="Count").fillna(0)
 
-    fig_weekly.update_traces(textposition="outside")
-
-    st.plotly_chart(fig_weekly, use_container_width=True)
+    st.bar_chart(weekly_pivot)
 
     # ==============================
     # 📊 WEEKLY ECDF
     # ==============================
     st.markdown("### 📊 Weekly Distribution (ECDF)")
 
-    fig_weekly_ecdf = px.ecdf(
-        weekly,
-        x="Count",
-        color="Name"
-    )
-
+    fig_weekly_ecdf = px.ecdf(weekly, x="Count", color="Name")
     st.plotly_chart(fig_weekly_ecdf, use_container_width=True)
 
     # ==============================
-    # 📆 MONTHLY COMPARISON
+    # 📆 MONTHLY PAIR
     # ==============================
-    st.markdown("### 📆 Monthly Comparison")
+    st.markdown("### 📆 Monthly Pair Comparison")
 
     monthly = df.groupby(["Month", "Name"]).size().reset_index(name="Count")
 
-    fig_monthly = px.bar(
-        monthly,
-        x="Month",
-        y="Count",
-        color="Name",
-        barmode="group",
-        text="Count"
-    )
+    monthly_pivot = monthly.pivot(index="Month", columns="Name", values="Count").fillna(0)
 
-    fig_monthly.update_traces(textposition="outside")
-
-    st.plotly_chart(fig_monthly, use_container_width=True)
+    st.bar_chart(monthly_pivot)
 
     # ==============================
     # 📊 MONTHLY ECDF
     # ==============================
     st.markdown("### 📊 Monthly Distribution (ECDF)")
 
-    fig_monthly_ecdf = px.ecdf(
-        monthly,
-        x="Count",
-        color="Name"
-    )
-
+    fig_monthly_ecdf = px.ecdf(monthly, x="Count", color="Name")
     st.plotly_chart(fig_monthly_ecdf, use_container_width=True)
 
 # ==============================
