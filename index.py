@@ -4,8 +4,14 @@ import plotly.express as px
 from sklearn.linear_model import LinearRegression
 import numpy as np
 
-st.set_page_config(layout="wide")
+# ==============================
+# PAGE CONFIG
+# ==============================
+st.set_page_config(page_title="Attendance Monitoring", layout="wide")
 st.title("📊 Attendance Monitoring System")
+
+# 🔄 AUTO REFRESH (30 seconds)
+st.autorefresh(interval=30000, key="datarefresh")
 
 # ==============================
 # CONFIG
@@ -16,9 +22,9 @@ staff1_name = "Amira"
 staff2_name = "Idham"
 
 # ==============================
-# LOAD DATA
+# LOAD DATA (AUTO UPDATE)
 # ==============================
-@st.cache_data
+@st.cache_data(ttl=30)
 def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
     df_raw = pd.read_csv(url)
@@ -27,11 +33,18 @@ def load_data():
 
 df_raw = load_data()
 
-# ==============================
-# TRANSFORM DATA
-# ==============================
-df_data = df_raw.iloc[2:].reset_index(drop=True)
+# Manual refresh button
+if st.button("🔄 Refresh Now"):
+    st.cache_data.clear()
+    st.rerun()
 
+# ==============================
+# TRANSFORM DATA (SAFE VERSION)
+# ==============================
+df_data = df_raw.copy()
+df_data = df_data.dropna(how="all").reset_index(drop=True)
+
+# Split staff columns safely
 df1 = df_data.iloc[:, 0:6].copy()
 df2 = df_data.iloc[:, 7:13].copy()
 
@@ -43,6 +56,7 @@ df2["Name"] = staff2_name
 
 df = pd.concat([df1, df2], ignore_index=True)
 
+# Clean data
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 df = df.dropna(subset=["Date"])
 
@@ -50,7 +64,7 @@ df["Name"] = df["Name"].astype(str).str.strip()
 df["Leave Type"] = df["Leave Type"].astype(str).str.strip()
 
 # ==============================
-# DATE FILTER
+# SIDEBAR FILTERS
 # ==============================
 st.sidebar.header("📅 Date Filter")
 
@@ -66,11 +80,11 @@ date_range = st.sidebar.date_input(
 
 if len(date_range) == 2:
     start_date, end_date = date_range
-    df = df[(df["Date"] >= pd.to_datetime(start_date)) & (df["Date"] <= pd.to_datetime(end_date))]
+    df = df[
+        (df["Date"] >= pd.to_datetime(start_date)) &
+        (df["Date"] <= pd.to_datetime(end_date))
+    ]
 
-# ==============================
-# OTHER FILTERS
-# ==============================
 st.sidebar.header("🔎 Filters")
 
 staff_list = sorted(df["Name"].unique())
@@ -110,7 +124,7 @@ with tab1:
         leave = df["Leave Type"].value_counts().reset_index()
         leave.columns = ["Leave Type", "Count"]
 
-        fig = px.bar(leave, x="Leave Type", y="Count", text="Count", color="Leave Type")
+        fig = px.bar(leave, x="Leave Type", y="Count", text="Count")
 
     else:
         leave = df.groupby(["Leave Type", "Name"]).size().reset_index(name="Count")
@@ -151,19 +165,17 @@ with tab2:
 
     df_year = df_monitor[df_monitor["Year"] == selected_year].copy()
 
+    df_year["Month"] = df_year["Date"].dt.month_name()
+
+    monthly = df_year.groupby(["Month", "Name"]).size().reset_index(name="Count")
+
     month_order = [
         "January","February","March","April","May","June",
         "July","August","September","October","November","December"
     ]
 
-    df_year["Month"] = df_year["Date"].dt.month_name()
-
-    monthly = df_year.groupby(["Month", "Name"]).size().reset_index(name="Count")
-
     monthly["Month"] = pd.Categorical(monthly["Month"], categories=month_order, ordered=True)
     monthly = monthly.sort_values("Month")
-
-    st.markdown("### 📆 Monthly Summary")
 
     fig_month = px.bar(
         monthly,
@@ -185,7 +197,7 @@ with tab2:
     if today_df.empty:
         st.success("✅ No absentees today")
     else:
-        st.dataframe(today_df)
+        st.dataframe(today_df, use_container_width=True)
 
     st.markdown("### ⚠️ Frequent Absentees")
 
@@ -193,13 +205,13 @@ with tab2:
     alert.columns = ["Name", "Count"]
     alert = alert[alert["Count"] >= 3]
 
-    st.dataframe(alert)
+    st.dataframe(alert, use_container_width=True)
 
 # ==============================
 # TRENDS
 # ==============================
 with tab3:
-    st.subheader("📈 Pair Comparison Trends")
+    st.subheader("📈 Trends")
 
     df_trend = df.copy()
     df_trend["Week"] = df_trend["Date"].dt.to_period("W").astype(str)
@@ -226,18 +238,7 @@ with tab4:
     df_display = df.copy()
     df_display["Date"] = df_display["Date"].dt.strftime("%d %b %Y")
 
-    def highlight_leave(val):
-        if val == "ML":
-            return "background-color: #ffcccc"
-        elif val == "VL":
-            return "background-color: #cce5ff"
-        elif val == "UL":
-            return "background-color: #fff3cd"
-        return ""
-
-    styled_df = df_display.style.map(highlight_leave, subset=["Leave Type"])
-
-    st.dataframe(styled_df, use_container_width=True)
+    st.dataframe(df_display, use_container_width=True)
 
 # ==============================
 # FORECAST
@@ -253,19 +254,19 @@ with tab5:
 
     monthly["t"] = np.arange(len(monthly))
 
-    X = monthly[["t"]]
-    y = monthly["Count"]
-
     model = LinearRegression()
-    model.fit(X, y)
+    model.fit(monthly[["t"]], monthly["Count"])
 
     future_steps = 4
     future_t = np.arange(len(monthly), len(monthly) + future_steps)
 
     future_pred = model.predict(future_t.reshape(-1, 1))
 
-    last_date = monthly["Month"].iloc[-1]
-    future_dates = pd.date_range(start=last_date, periods=future_steps + 1, freq="MS")[1:]
+    future_dates = pd.date_range(
+        start=monthly["Month"].iloc[-1],
+        periods=future_steps + 1,
+        freq="MS"
+    )[1:]
 
     future_df = pd.DataFrame({
         "Month": future_dates,
@@ -276,10 +277,7 @@ with tab5:
     monthly.rename(columns={"Count": "Value"}, inplace=True)
     monthly["Type"] = "Actual"
 
-    combined = pd.concat([
-        monthly[["Month", "Value", "Type"]],
-        future_df
-    ])
+    combined = pd.concat([monthly[["Month", "Value", "Type"]], future_df])
 
     fig = px.line(
         combined,
