@@ -99,7 +99,14 @@ tabs = st.tabs(["🏠 Summary"] + [f"👤 {name}" for name in staff_names])
 # 🏠 SUMMARY TAB
 # ==============================
 with tabs[0]:
+    # Today status
+    st.markdown("## 🟢 Today Status")
+    today_df = df[df["Date"] == today]
 
+    if today_df.empty:
+        st.success("✅ Everyone Present")
+    else:
+        st.dataframe(today_df, use_container_width=True)
     st.markdown("## 📊 Summary")
 
     ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(df)
@@ -182,14 +189,7 @@ with tabs[0]:
 
     st.plotly_chart(fig2, use_container_width=True)
 
-    # Today status
-    st.markdown("## 🟢 Today Status")
-    today_df = df[df["Date"] == today]
 
-    if today_df.empty:
-        st.success("✅ Everyone Present")
-    else:
-        st.dataframe(today_df, use_container_width=True)
 
 # ==============================
 # 👤 STAFF TABS
