@@ -107,6 +107,7 @@ with tabs[0]:
 
     absence_rate = (absence_total / max(calendar_days,1)) * 100
 
+    # KPI
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("🩺 ML", ml)
     c2.metric("🏖 VL", vl)
@@ -149,7 +150,7 @@ with tabs[0]:
     st.plotly_chart(fig1, use_container_width=True)
 
     # ==========================
-    # 📊 STACKED BREAKDOWN
+    # 📊 GROUPED BREAKDOWN (NO STACK)
     # ==========================
     st.markdown("## 📊 Absence Breakdown by Staff")
 
@@ -166,18 +167,18 @@ with tabs[0]:
         rows.append({"Name": person, "Type": "Urgent", "Count": urgent})
         rows.append({"Name": person, "Type": "Emergency", "Count": emergency})
 
-    stack_df = pd.DataFrame(rows)
+    group_df = pd.DataFrame(rows)
 
     fig2 = px.bar(
-        stack_df,
-        x="Name",
+        group_df,
+        x="Type",
         y="Count",
-        color="Type",
-        barmode="stack",
+        color="Name",
+        barmode="group",
         text="Count"
     )
 
-    fig2.update_traces(textposition="inside")
+    fig2.update_traces(textposition="outside")
 
     st.plotly_chart(fig2, use_container_width=True)
 
