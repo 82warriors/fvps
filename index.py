@@ -8,9 +8,11 @@ from pathlib import Path
 # ==============================
 # PAGE CONFIG
 # ==============================
+logo_path = Path(__file__).parent / "logo.png"
+
 st.set_page_config(
     page_title="Attendance Tracking",
-    page_icon="🔴",
+    page_icon=str(logo_path),  # 👈 use your logo
     layout="wide"
 )
 
