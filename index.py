@@ -6,13 +6,23 @@ from datetime import datetime
 from pathlib import Path
 
 # ==============================
-# PAGE CONFIG
+# CONFIG
+# ==============================
+SHEET_ID = "1TZcv_U-U7R9OM98AEMzZ2gvu2Ca6ddqd3yCCxXsTvhE"
+staff1_name = "Amira"
+staff2_name = "Idham"
+
+# ==============================
+# LOGO (LOAD FIRST)
 # ==============================
 logo_path = Path(__file__).parent / "logo.png"
 
+# ==============================
+# PAGE CONFIG (MUST BE FIRST ST COMMAND)
+# ==============================
 st.set_page_config(
     page_title="Attendance Tracking",
-    page_icon=str(logo_path),  # 👈 use your logo
+    page_icon=str(logo_path) if logo_path.exists() else "🔴",
     layout="wide"
 )
 
@@ -31,18 +41,19 @@ footer {visibility: hidden;}
 """, unsafe_allow_html=True)
 
 # ==============================
-# HEADER (LOGO + TITLE)
+# HEADER
 # ==============================
-logo_path = Path(__file__).parent / "logo.png"
-
-col1, col2 = st.columns([1, 10])
+col1, col2 = st.columns([1.2, 10])
 
 with col1:
-    st.image(logo_path, width=60)
+    if logo_path.exists():
+        st.image(logo_path, width=70)
+    else:
+        st.write("🔴")
 
 with col2:
     st.markdown("""
-    <h1 style='margin-bottom:0;'>🔴 Attendance Tracking</h1>
+    <h1 style='margin-bottom:0;'>Attendance Tracking</h1>
     <p style='color:gray;margin-top:0;'>Real-time monitoring system</p>
     """, unsafe_allow_html=True)
 
@@ -52,13 +63,6 @@ st.divider()
 # AUTO REFRESH
 # ==============================
 st_autorefresh(interval=30000, key="refresh")
-
-# ==============================
-# CONFIG
-# ==============================
-SHEET_ID = "1TZcv_U-U7R9OM98AEMzZ2gvu2Ca6ddqd3yCCxXsTvhE"
-staff1_name = "Amira"
-staff2_name = "Idham"
 
 # ==============================
 # LOAD DATA
@@ -79,7 +83,7 @@ if st.button("🔄 Refresh Now"):
 st.caption(f"Last updated: {datetime.now().strftime('%d %b %Y %H:%M:%S')}")
 
 # ==============================
-# TRANSFORM
+# DATA TRANSFORMATION
 # ==============================
 df_raw = df_raw.dropna(how="all").reset_index(drop=True)
 
@@ -124,7 +128,7 @@ staff_names = df["Name"].unique().tolist()
 tabs = st.tabs(["🏠 Summary"] + [f"👤 {name}" for name in staff_names])
 
 # ==============================
-# SUMMARY
+# SUMMARY TAB
 # ==============================
 with tabs[0]:
 
@@ -152,7 +156,9 @@ with tabs[0]:
 
     st.metric("Late Count", late_count)
 
-    # Comparison
+    # ==============================
+    # COMPARISON CHART
+    # ==============================
     st.markdown("## 📊 Total Absence Comparison")
 
     comparison_data = []
@@ -163,11 +169,22 @@ with tabs[0]:
 
     comparison_df = pd.DataFrame(comparison_data)
 
-    fig1 = px.bar(comparison_df, x="Name", y="Total Absence", text="Total Absence", color="Name")
-    fig1.update_traces(textposition="outside")
-    fig1.update_layout(showlegend=False)
+    fig = px.bar(
+        comparison_df,
+        x="Name",
+        y="Total Absence",
+        text="Total Absence",
+        color="Name"
+    )
 
-    st.plotly_chart(fig1, use_container_width=True)
+    fig.update_traces(textposition="outside")
+    fig.update_layout(
+        showlegend=False,
+        yaxis_title="Absences",
+        xaxis_title="Staff"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
 
 # ==============================
 # STAFF TABS
@@ -183,5 +200,6 @@ for i, person in enumerate(staff_names, start=1):
         ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(person_df)
         late_count = person_df["Leave Type"].str.contains("late", case=False).sum()
 
-        st.metric("Total Absence", absence_total)
-        st.metric("Late Count", late_count)
+        c1, c2 = st.columns(2)
+        c1.metric("Total Absence", absence_total)
+        c2.metric("Late Count", late_count)
