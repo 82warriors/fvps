@@ -139,6 +139,38 @@ with tabs[0]:
     st.dataframe(latest)
 
 # ==============================
+# 👥 STAFF COMPARISON TABLE
+# ==============================
+st.markdown("## 👥 Staff Comparison")
+
+comparison_data = []
+
+for person in staff_names:
+
+    person_df = df[df["Name"] == person]
+
+    ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(person_df)
+    late_count = person_df["Leave Type"].str.contains("late", case=False).sum()
+
+    absence_rate = (absence_total / max(calendar_days,1)) * 100
+
+    comparison_data.append({
+        "Name": person,
+        "ML": ml,
+        "VL": vl,
+        "CCL": ccl,
+        "Urgent": urgent,
+        "Emergency": emergency,
+        "Total Absence": absence_total,
+        "Absence %": round(absence_rate, 2),
+        "Late": late_count
+    })
+
+comparison_df = pd.DataFrame(comparison_data)
+
+st.dataframe(comparison_df, use_container_width=True)
+
+# ==============================
 # 👤 STAFF TABS
 # ==============================
 for i, person in enumerate(staff_names, start=1):
