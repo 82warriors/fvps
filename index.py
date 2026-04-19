@@ -203,3 +203,29 @@ for i, person in enumerate(staff_names, start=1):
         c1, c2 = st.columns(2)
         c1.metric("Total Absence", absence_total)
         c2.metric("Late Count", late_count)
+
+        # --------------------------
+        # Breakdown Chart
+        # --------------------------
+        st.markdown("### 📊 Absence Breakdown")
+
+        breakdown_df = pd.DataFrame({
+            "Type": ["ML", "VL", "CCL", "Urgent", "Emergency"],
+            "Count": [ml, vl, ccl, urgent, emergency]
+        })
+
+        fig4 = px.bar(breakdown_df, x="Type", y="Count", text="Count", color="Type")
+        fig4.update_traces(textposition="outside")
+
+        st.plotly_chart(fig4, use_container_width=True)
+
+        # --------------------------
+        # Trend Chart
+        # --------------------------
+        st.markdown("### 📈 Personal Trend")
+
+        person_trend = person_df.groupby("Date").size().reset_index(name="Count")
+
+        fig5 = px.line(person_trend, x="Date", y="Count", markers=True)
+
+        st.plotly_chart(fig5, use_container_width=True)
