@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 from sklearn.linear_model import LinearRegression
 import numpy as np
+from streamlit_autorefresh import st_autorefresh
+from datetime import datetime
 
 # ==============================
 # PAGE CONFIG
@@ -10,8 +12,10 @@ import numpy as np
 st.set_page_config(page_title="Attendance Monitoring", layout="wide")
 st.title("📊 Attendance Monitoring System")
 
-# 🔄 AUTO REFRESH (30 seconds)
-st.autorefresh(interval=30000, key="datarefresh")
+# ==============================
+# AUTO REFRESH (30 sec)
+# ==============================
+st_autorefresh(interval=30000, key="datarefresh")
 
 # ==============================
 # CONFIG
@@ -22,7 +26,7 @@ staff1_name = "Amira"
 staff2_name = "Idham"
 
 # ==============================
-# LOAD DATA (AUTO UPDATE)
+# LOAD DATA
 # ==============================
 @st.cache_data(ttl=30)
 def load_data():
@@ -33,18 +37,29 @@ def load_data():
 
 df_raw = load_data()
 
-# Manual refresh button
-if st.button("🔄 Refresh Now"):
-    st.cache_data.clear()
-    st.rerun()
+# ==============================
+# MANUAL REFRESH
+# ==============================
+col_refresh, col_time = st.columns([1, 3])
+
+with col_refresh:
+    if st.button("🔄 Refresh Now"):
+        st.cache_data.clear()
+        st.rerun()
+
+with col_time:
+    st.caption(f"Last updated: {datetime.now().strftime('%d %b %Y %H:%M:%S')}")
 
 # ==============================
-# TRANSFORM DATA (SAFE VERSION)
+# TRANSFORM DATA
 # ==============================
-df_data = df_raw.copy()
-df_data = df_data.dropna(how="all").reset_index(drop=True)
+df_data = df_raw.dropna(how="all").reset_index(drop=True)
 
-# Split staff columns safely
+# Protect against column mismatch
+if df_data.shape[1] < 13:
+    st.error("❌ Sheet format mismatch. Please check column structure.")
+    st.stop()
+
 df1 = df_data.iloc[:, 0:6].copy()
 df2 = df_data.iloc[:, 7:13].copy()
 
@@ -56,7 +71,7 @@ df2["Name"] = staff2_name
 
 df = pd.concat([df1, df2], ignore_index=True)
 
-# Clean data
+# Clean
 df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 df = df.dropna(subset=["Date"])
 
@@ -164,16 +179,14 @@ with tab2:
     selected_year = st.selectbox("Select Year", years)
 
     df_year = df_monitor[df_monitor["Year"] == selected_year].copy()
-
     df_year["Month"] = df_year["Date"].dt.month_name()
-
-    monthly = df_year.groupby(["Month", "Name"]).size().reset_index(name="Count")
 
     month_order = [
         "January","February","March","April","May","June",
         "July","August","September","October","November","December"
     ]
 
+    monthly = df_year.groupby(["Month", "Name"]).size().reset_index(name="Count")
     monthly["Month"] = pd.Categorical(monthly["Month"], categories=month_order, ordered=True)
     monthly = monthly.sort_values("Month")
 
@@ -284,10 +297,8 @@ with tab5:
         x="Month",
         y="Value",
         color="Type",
-        markers=True,
-        title="Absence Forecast (Next 4 Months)"
+        markers=True
     )
 
     st.plotly_chart(fig, use_container_width=True)
-
     st.info("📌 Forecast uses linear trend (basic prediction)")
