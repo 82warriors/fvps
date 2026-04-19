@@ -11,7 +11,7 @@ st.set_page_config(layout="wide")
 st.title("🔴 Real-Time Attendance Ops Dashboard")
 
 # ==============================
-# AUTO REFRESH (30 sec)
+# AUTO REFRESH
 # ==============================
 st_autorefresh(interval=30000, key="refresh")
 
@@ -19,7 +19,6 @@ st_autorefresh(interval=30000, key="refresh")
 # CONFIG
 # ==============================
 SHEET_ID = "1TZcv_U-U7R9OM98AEMzZ2gvu2Ca6ddqd3yCCxXsTvhE"
-
 staff1_name = "Amira"
 staff2_name = "Idham"
 
@@ -92,9 +91,6 @@ c4.metric("📈 Late %", f"{late_rate:.2f}%")
 # ==============================
 col1, col2 = st.columns([2,1])
 
-# ------------------------------
-# LIVE STATUS
-# ------------------------------
 with col1:
     st.markdown("## 🟢 Live Status (Today)")
 
@@ -109,9 +105,6 @@ with col1:
 
         st.dataframe(today_df.style.apply(highlight, axis=1), use_container_width=True)
 
-# ------------------------------
-# ALERT PANEL
-# ------------------------------
 with col2:
     st.markdown("## 🚨 Alerts")
 
@@ -167,3 +160,67 @@ if st.session_state.last_seen != current_latest:
     st.session_state.last_seen = current_latest
 
 st.dataframe(latest, use_container_width=True)
+
+# ==============================
+# 👤 INDIVIDUAL STAFF DASHBOARD
+# ==============================
+st.markdown("## 👤 Staff Performance Dashboard")
+
+for person in df["Name"].unique():
+
+    st.markdown(f"### 👤 {person}")
+
+    person_df = df[df["Name"] == person]
+
+    total = len(person_df)
+    late_count = person_df["Leave Type"].str.contains("Late", case=False).sum()
+    absence_count = person_df["Leave Type"].isin(["ML","VL","UL","CCL","Emergency Leave"]).sum()
+
+    late_rate = (late_count / max(total,1)) * 100
+    absence_rate = (absence_count / max(total,1)) * 100
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("📅 Total Records", total)
+    c2.metric("⏰ Late %", f"{late_rate:.2f}%")
+    c3.metric("🚫 Absence %", f"{absence_rate:.2f}%")
+
+    # Monthly chart
+    st.markdown("📈 Monthly")
+
+    temp = person_df.copy()
+    temp["Month"] = temp["Date"].dt.to_period("M").astype(str)
+
+    monthly = temp.groupby("Month").size().reset_index(name="Count")
+
+    fig = px.bar(monthly, x="Month", y="Count", text="Count")
+    fig.update_traces(textposition="outside")
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Leave breakdown
+    st.markdown("📊 Leave Breakdown")
+
+    breakdown = person_df["Leave Type"].value_counts().reset_index()
+    breakdown.columns = ["Type", "Count"]
+
+    fig2 = px.pie(breakdown, names="Type", values="Count")
+    st.plotly_chart(fig2, use_container_width=True)
+
+    # Alerts
+    st.markdown("🚨 Alerts")
+
+    alerts = []
+
+    if late_count >= 3:
+        alerts.append("⏰ Frequent late")
+
+    if absence_count >= 3:
+        alerts.append("🚫 Frequent absence")
+
+    if not alerts:
+        st.success("✅ No issues")
+    else:
+        for a in alerts:
+            st.warning(a)
+
+    st.divider()
