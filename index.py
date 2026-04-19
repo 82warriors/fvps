@@ -9,7 +9,7 @@ from pathlib import Path
 # PAGE CONFIG
 # ==============================
 st.set_page_config(
-    page_title="Attendance Ops Dashboard",
+    page_title="Attendance Tracking",
     page_icon="🔴",
     layout="wide"
 )
