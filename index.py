@@ -41,7 +41,7 @@ if st.button("🔄 Refresh Now"):
 st.caption(f"Last updated: {datetime.now().strftime('%d %b %Y %H:%M:%S')}")
 
 # ==============================
-# TRANSFORM DATA
+# TRANSFORM
 # ==============================
 df_raw = df_raw.dropna(how="all").reset_index(drop=True)
 
@@ -65,12 +65,7 @@ start_date = pd.to_datetime("2024-12-30")
 df = df[df["Date"] >= start_date]
 
 # Clean leave type
-df["Leave Type"] = (
-    df["Leave Type"]
-    .astype(str)
-    .str.strip()
-    .str.lower()
-)
+df["Leave Type"] = df["Leave Type"].astype(str).str.strip().str.lower()
 
 # Calendar days
 today = pd.Timestamp.today().normalize()
@@ -95,13 +90,12 @@ staff_names = df["Name"].unique().tolist()
 tabs = st.tabs(["🏠 Summary"] + [f"👤 {name}" for name in staff_names])
 
 # ==============================
-# 🏠 SUMMARY TAB
+# 🏠 SUMMARY
 # ==============================
 with tabs[0]:
 
-    # 🔼 MOVED TO TOP
+    # 🔼 TODAY FIRST
     st.markdown("## 🟢 Today Status")
-
     today_df = df[df["Date"] == today]
 
     if today_df.empty:
@@ -109,9 +103,7 @@ with tabs[0]:
     else:
         st.dataframe(today_df, use_container_width=True)
 
-    # ==========================
     # KPI
-    # ==========================
     st.markdown("## 📊 Summary")
 
     ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(df)
@@ -128,9 +120,9 @@ with tabs[0]:
 
     st.metric("⏰ Late Count", late_count)
 
-    # ==========================
-    # 📊 TOTAL ABSENCE COMPARISON
-    # ==========================
+    # --------------------------
+    # TOTAL ABSENCE COMPARISON
+    # --------------------------
     st.markdown("## 📊 Total Absence Comparison")
 
     comparison_data = []
@@ -159,16 +151,15 @@ with tabs[0]:
 
     st.plotly_chart(fig1, use_container_width=True)
 
-    # ==========================
-    # 📊 GROUPED BREAKDOWN
-    # ==========================
+    # --------------------------
+    # GROUPED BREAKDOWN
+    # --------------------------
     st.markdown("## 📊 Absence Breakdown by Staff")
 
     rows = []
 
     for person in staff_names:
         person_df = df[df["Name"] == person]
-
         ml, vl, ccl, urgent, emergency, _ = get_absence_breakdown(person_df)
 
         rows.extend([
@@ -195,7 +186,7 @@ with tabs[0]:
     st.plotly_chart(fig2, use_container_width=True)
 
 # ==============================
-# 👤 STAFF TABS (UNCHANGED)
+# 👤 STAFF TABS
 # ==============================
 for i, person in enumerate(staff_names, start=1):
 
@@ -219,3 +210,60 @@ for i, person in enumerate(staff_names, start=1):
         c6.metric("🚫 Total Absence", f"{absence_total} ({absence_rate:.2f}%)")
 
         st.metric("⏰ Late Count", late_count)
+
+        # ==========================
+        # MONTHLY
+        # ==========================
+        st.markdown("📈 Monthly")
+
+        temp = person_df.copy()
+        temp["Month"] = temp["Date"].dt.to_period("M").dt.to_timestamp()
+
+        monthly = temp.groupby("Month").size().reset_index(name="Count")
+
+        full_range = pd.date_range(start=start_date, end=today, freq="MS")
+        full_df = pd.DataFrame({"Month": full_range})
+
+        monthly = full_df.merge(monthly, on="Month", how="left").fillna(0)
+        monthly["Month_str"] = monthly["Month"].dt.strftime("%b %Y")
+
+        fig = px.bar(monthly, x="Month_str", y="Count", text="Count")
+
+        fig.update_traces(textposition="outside")
+        fig.update_layout(xaxis_tickangle=-45)
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # ==========================
+        # BREAKDOWN
+        # ==========================
+        st.markdown("📊 Absence Breakdown")
+
+        chart_df = pd.DataFrame({
+            "Type": ["ML","VL","CCL","Urgent","Emergency"],
+            "Count": [ml, vl, ccl, urgent, emergency]
+        })
+
+        fig2 = px.bar(chart_df, x="Type", y="Count", text="Count")
+        fig2.update_traces(textposition="outside")
+
+        st.plotly_chart(fig2, use_container_width=True)
+
+        # ==========================
+        # ALERTS
+        # ==========================
+        st.markdown("🚨 Alerts")
+
+        alerts = []
+
+        if absence_rate > 40:
+            alerts.append("🚫 High absence rate")
+
+        if late_count > 10:
+            alerts.append("⏰ High late frequency")
+
+        if not alerts:
+            st.success("✅ No issues")
+        else:
+            for a in alerts:
+                st.warning(a)
