@@ -191,11 +191,6 @@ with tabs[0]:
     else:
         st.dataframe(today_df, use_container_width=True)
 
-    # Latest entry
-    st.markdown("## 🆕 Latest Entry")
-    latest = df.sort_values("Date", ascending=False).head(1)
-    st.dataframe(latest)
-
 # ==============================
 # 👤 STAFF TABS
 # ==============================
