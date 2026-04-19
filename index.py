@@ -186,46 +186,49 @@ with tabs[0]:
 
     st.plotly_chart(fig, use_container_width=True)
 
-# ==============================
-# STAFF TABS
-# ==============================
+# ==================================================
+# 👤 STAFF TABS
+# ==================================================
 for i, person in enumerate(staff_names, start=1):
 
     with tabs[i]:
 
-        st.markdown(f"## 👤 {person}")
+        st.markdown(f"### 👤 {person}")
 
         person_df = df[df["Name"] == person]
 
         ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(person_df)
         late_count = person_df["Leave Type"].str.contains("late", case=False).sum()
 
-        c1, c2 = st.columns(2)
-        c1.metric("Total Absence", absence_total)
-        c2.metric("Late Count", late_count)
+        absence_rate = (absence_total / max(calendar_days,1)) * 100
 
-        # --------------------------
-        # Breakdown Chart
-        # --------------------------
-        st.markdown("### 📊 Absence Breakdown")
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1.metric("ML", ml)
+        c2.metric("VL", vl)
+        c3.metric("CCL", ccl)
+        c4.metric("Urgent", urgent)
+        c5.metric("Emergency", emergency)
+        c6.metric("Total Absence", f"{absence_total} ({absence_rate:.2f}%)")
 
-        breakdown_df = pd.DataFrame({
-            "Type": ["ML", "VL", "CCL", "Urgent", "Emergency"],
-            "Count": [ml, vl, ccl, urgent, emergency]
-        })
+        st.metric("Late Count", late_count)
 
-        fig4 = px.bar(breakdown_df, x="Type", y="Count", text="Count", color="Type")
-        fig4.update_traces(textposition="outside")
+        # Monthly Chart
+        st.markdown("### 📈 Monthly")
 
-        st.plotly_chart(fig4, use_container_width=True)
+        temp = person_df.copy()
+        temp["Month"] = temp["Date"].dt.to_period("M").dt.to_timestamp()
 
-        # --------------------------
-        # Trend Chart
-        # --------------------------
-        st.markdown("### 📈 Personal Trend")
+        monthly = temp.groupby("Month").size().reset_index(name="Count")
 
-        person_trend = person_df.groupby("Date").size().reset_index(name="Count")
+        full_range = pd.date_range(start=start_date, end=today, freq="MS")
+        full_df = pd.DataFrame({"Month": full_range})
 
-        fig5 = px.line(person_trend, x="Date", y="Count", markers=True)
+        monthly = full_df.merge(monthly, on="Month", how="left").fillna(0)
+        monthly["Month_str"] = monthly["Month"].dt.strftime("%b %Y")
 
-        st.plotly_chart(fig5, use_container_width=True)
+        fig = px.bar(monthly, x="Month_str", y="Count", text="Count")
+
+        fig.update_traces(textposition="outside")
+        fig.update_layout(xaxis_tickangle=-45)
+
+        st.plotly_chart(fig, use_container_width=True)
