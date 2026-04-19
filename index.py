@@ -40,7 +40,7 @@ with col1:
 
 with col2:
     st.markdown("""
-    <h1 style='margin-bottom:0;'>🔴 Attendance Ops Dashboard</h1>
+    <h1 style='margin-bottom:0;'>🔴 Attendance Tracking</h1>
     <p style='color:gray;margin-top:0;'>Real-time monitoring system</p>
     """, unsafe_allow_html=True)
 
