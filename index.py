@@ -34,7 +34,6 @@ def load_data():
 
 df_raw = load_data()
 
-# Manual refresh
 if st.button("🔄 Refresh Now"):
     st.cache_data.clear()
     st.rerun()
@@ -42,7 +41,7 @@ if st.button("🔄 Refresh Now"):
 st.caption(f"Last updated: {datetime.now().strftime('%d %b %Y %H:%M:%S')}")
 
 # ==============================
-# TRANSFORM DATA
+# TRANSFORM
 # ==============================
 df_raw = df_raw.dropna(how="all").reset_index(drop=True)
 
@@ -57,21 +56,14 @@ df2["Name"] = staff2_name
 
 df = pd.concat([df1, df2])
 
-# Clean date
 df["Date"] = pd.to_datetime(df["Date"].astype(str).str.strip(), errors="coerce")
 df = df.dropna(subset=["Date"])
 
-# ==============================
-# FILTER START DATE
-# ==============================
+# Filter start date
 start_date = pd.to_datetime("2024-12-30")
 df = df[df["Date"] >= start_date]
 
-st.caption("Showing data from 30 Dec 2024 onwards")
-
-# ==============================
-# CLEAN TEXT
-# ==============================
+# Clean text
 df["Leave Type"] = (
     df["Leave Type"]
     .astype(str)
@@ -79,52 +71,63 @@ df["Leave Type"] = (
     .str.lower()
 )
 
-# ==============================
-# ABSENCE TYPES
-# ==============================
-absence_types = [
-    "emergency leave",
-    "ccl",
-    "urgent leave",
-    "vl",
-    "ml"
-]
+# Calendar days
+today = pd.Timestamp.today().normalize()
+calendar_days = (today - start_date).days + 1
 
 # ==============================
-# CREATE TABS
+# FUNCTION: ABSENCE BREAKDOWN
+# ==============================
+def get_absence_breakdown(data):
+    ml = (data["Leave Type"] == "ml").sum()
+    vl = (data["Leave Type"] == "vl").sum()
+    ccl = (data["Leave Type"] == "ccl").sum()
+    urgent = (data["Leave Type"] == "urgent leave").sum()
+    emergency = (data["Leave Type"] == "emergency leave").sum()
+
+    total = ml + vl + ccl + urgent + emergency
+
+    return ml, vl, ccl, urgent, emergency, total
+
+# ==============================
+# TABS
 # ==============================
 staff_names = df["Name"].unique().tolist()
 tabs = st.tabs(["🏠 Summary"] + [f"👤 {name}" for name in staff_names])
 
 # ==============================
-# 🏠 SUMMARY TAB
+# 🏠 SUMMARY
 # ==============================
 with tabs[0]:
 
     st.markdown("## 📊 Summary")
 
-    total_days = len(df)
+    ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(df)
 
-    absence_count = df["Leave Type"].isin(absence_types).sum()
     late_count = df["Leave Type"].str.contains("late", case=False).sum()
 
-    present_days = total_days - absence_count
+    absence_rate = (absence_total / max(calendar_days,1)) * 100
 
-    absence_rate = (absence_count / max(total_days,1)) * 100
-    late_rate = (late_count / max(present_days,1)) * 100
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("🩺 ML", ml)
+    c2.metric("🏖 VL", vl)
+    c3.metric("👶 CCL", ccl)
+    c4.metric("⚡ Urgent", urgent)
+    c5.metric("🚨 Emergency", emergency)
 
-    c1.metric("📅 Total Days", total_days)
-    c2.metric("🚫 Absence", f"{absence_count} days", f"{absence_rate:.2f}%")
-    c3.metric("⏰ Late", f"{late_count} days", f"{late_rate:.2f}%")
-    c4.metric("✅ Present Days", present_days)
+    c6.metric(
+        "🚫 Total Absence",
+        f"{absence_total}",
+        f"{absence_rate:.2f}%"
+    )
 
-    # Today's data
-    today = pd.Timestamp.today().normalize()
+    st.metric("⏰ Late Count", late_count)
+
+    # Today status
     today_df = df[df["Date"] == today]
 
-    st.markdown("## 🟢 Live Status (Today)")
+    st.markdown("## 🟢 Today Status")
     if today_df.empty:
         st.success("✅ Everyone Present")
     else:
@@ -133,7 +136,7 @@ with tabs[0]:
     # Latest entry
     st.markdown("## 🆕 Latest Entry")
     latest = df.sort_values("Date", ascending=False).head(1)
-    st.dataframe(latest, use_container_width=True)
+    st.dataframe(latest)
 
 # ==============================
 # 👤 STAFF TABS
@@ -142,45 +145,46 @@ for i, person in enumerate(staff_names, start=1):
 
     with tabs[i]:
 
-        st.markdown(f"## 👤 {person} Dashboard")
+        st.markdown(f"## 👤 {person}")
 
-        # ✅ DEFINE FIRST
         person_df = df[df["Name"] == person]
 
-        # ==========================
-        # KPI
-        # ==========================
-        total_days = len(person_df)
+        ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(person_df)
 
-        absence_count = person_df["Leave Type"].isin(absence_types).sum()
         late_count = person_df["Leave Type"].str.contains("late", case=False).sum()
 
-        present_days = total_days - absence_count
+        absence_rate = (absence_total / max(calendar_days,1)) * 100
 
-        absence_rate = (absence_count / max(total_days,1)) * 100
-        late_rate = (late_count / max(present_days,1)) * 100
+        # KPI
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
 
-        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("🩺 ML", ml)
+        c2.metric("🏖 VL", vl)
+        c3.metric("👶 CCL", ccl)
+        c4.metric("⚡ Urgent", urgent)
+        c5.metric("🚨 Emergency", emergency)
 
-        c1.metric("📅 Total Days", total_days)
-
-        c2.metric(
-            "🚫 Absence",
-            f"{absence_count} days",
+        c6.metric(
+            "🚫 Total Absence",
+            f"{absence_total}",
             f"{absence_rate:.2f}%"
         )
 
-        c3.metric(
-            "⏰ Late",
-            f"{late_count} days",
-            f"{late_rate:.2f}%"
-        )
+        st.metric("⏰ Late Count", late_count)
 
-        c4.metric("✅ Present Days", present_days)
+        # Chart
+        st.markdown("📊 Absence Breakdown")
 
-        # ==========================
-        # MONTHLY CHART
-        # ==========================
+        chart_df = pd.DataFrame({
+            "Type": ["ML","VL","CCL","Urgent","Emergency"],
+            "Count": [ml, vl, ccl, urgent, emergency]
+        })
+
+        fig = px.bar(chart_df, x="Type", y="Count", text="Count")
+        fig.update_traces(textposition="outside")
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Monthly
         st.markdown("📈 Monthly")
 
         temp = person_df.copy()
@@ -188,25 +192,10 @@ for i, person in enumerate(staff_names, start=1):
 
         monthly = temp.groupby("Month").size().reset_index(name="Count")
 
-        fig = px.bar(monthly, x="Month", y="Count", text="Count")
-        fig.update_traces(textposition="outside")
-
-        st.plotly_chart(fig, use_container_width=True)
-
-        # ==========================
-        # LEAVE BREAKDOWN
-        # ==========================
-        st.markdown("📊 Leave Breakdown")
-
-        breakdown = person_df["Leave Type"].value_counts().reset_index()
-        breakdown.columns = ["Type", "Count"]
-
-        fig2 = px.pie(breakdown, names="Type", values="Count")
+        fig2 = px.bar(monthly, x="Month", y="Count", text="Count")
         st.plotly_chart(fig2, use_container_width=True)
 
-        # ==========================
-        # ALERTS
-        # ==========================
+        # Alerts
         st.markdown("🚨 Alerts")
 
         alerts = []
@@ -214,8 +203,8 @@ for i, person in enumerate(staff_names, start=1):
         if absence_rate > 40:
             alerts.append("🚫 High absence rate")
 
-        if late_rate > 30:
-            alerts.append("⏰ High late rate")
+        if late_count > 10:
+            alerts.append("⏰ High late frequency")
 
         if not alerts:
             st.success("✅ No issues")
