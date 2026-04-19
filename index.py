@@ -5,13 +5,19 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 
 # ==============================
-# CONFIG
+# PAGE CONFIG
 # ==============================
 st.set_page_config(layout="wide")
 st.title("🔴 Attendance Ops Dashboard")
 
+# ==============================
+# AUTO REFRESH
+# ==============================
 st_autorefresh(interval=30000, key="refresh")
 
+# ==============================
+# CONFIG
+# ==============================
 SHEET_ID = "1TZcv_U-U7R9OM98AEMzZ2gvu2Ca6ddqd3yCCxXsTvhE"
 staff1_name = "Amira"
 staff2_name = "Idham"
@@ -28,6 +34,7 @@ def load_data():
 
 df_raw = load_data()
 
+# Manual refresh
 if st.button("🔄 Refresh Now"):
     st.cache_data.clear()
     st.rerun()
@@ -35,7 +42,7 @@ if st.button("🔄 Refresh Now"):
 st.caption(f"Last updated: {datetime.now().strftime('%d %b %Y %H:%M:%S')}")
 
 # ==============================
-# TRANSFORM
+# TRANSFORM DATA
 # ==============================
 df_raw = df_raw.dropna(how="all").reset_index(drop=True)
 
@@ -50,8 +57,19 @@ df2["Name"] = staff2_name
 
 df = pd.concat([df1, df2])
 
+# Clean date
 df["Date"] = pd.to_datetime(df["Date"].astype(str).str.strip(), errors="coerce")
 df = df.dropna(subset=["Date"])
+
+# ==============================
+# FILTER START DATE
+# ==============================
+start_date = pd.to_datetime("2024-12-30")
+df = df[df["Date"] >= start_date]
+
+st.caption("Showing data from 30 Dec 2024 onwards")
+
+# Clean text
 df["Leave Type"] = df["Leave Type"].astype(str).str.strip()
 
 # ==============================
@@ -81,17 +99,17 @@ with tabs[0]:
     c3.metric("⏰ Late Count", late_count)
     c4.metric("📈 Late %", f"{late_rate:.2f}%")
 
-    # Live + Alerts
     col1, col2 = st.columns([2,1])
 
+    # Live Status
     with col1:
         st.markdown("## 🟢 Live Status (Today)")
-
         if today_df.empty:
             st.success("✅ Everyone Present")
         else:
             st.dataframe(today_df, use_container_width=True)
 
+    # Alerts
     with col2:
         st.markdown("## 🚨 Alerts")
 
@@ -122,6 +140,8 @@ with tabs[0]:
         breakdown.columns = ["Type", "Count"]
 
         fig = px.bar(breakdown, x="Type", y="Count", text="Count")
+        fig.update_traces(textposition="outside")
+
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("No absences today")
@@ -133,7 +153,7 @@ with tabs[0]:
     st.dataframe(latest, use_container_width=True)
 
 # ==============================
-# 👤 INDIVIDUAL TABS
+# 👤 STAFF TABS
 # ==============================
 for i, person in enumerate(staff_names, start=1):
 
@@ -164,9 +184,11 @@ for i, person in enumerate(staff_names, start=1):
         monthly = temp.groupby("Month").size().reset_index(name="Count")
 
         fig = px.bar(monthly, x="Month", y="Count", text="Count")
+        fig.update_traces(textposition="outside")
+
         st.plotly_chart(fig, use_container_width=True)
 
-        # Breakdown
+        # Leave Breakdown
         st.markdown("📊 Leave Breakdown")
 
         breakdown = person_df["Leave Type"].value_counts().reset_index()
