@@ -164,6 +164,50 @@ with tabs[0]:
     st.metric("Late Count", late_count)
 
     # ==============================
+    # 👥 STAFF SUMMARY
+    # ==============================
+    st.markdown("## 👥 Staff Summary (All Staff)")
+
+    summary_data = []
+
+    for person in staff_names:
+        person_df = df_year[df_year["Name"] == person]
+
+        ml, vl, ccl, urgent, emergency, total = get_absence_breakdown(person_df)
+        late = person_df["Leave Type"].str.contains("late", case=False).sum()
+
+        summary_data.append({
+            "Name": person,
+            "ML": ml,
+            "VL": vl,
+            "CCL": ccl,
+            "Urgent": urgent,
+            "Emergency": emergency,
+            "Late": late,
+            "Total Absence": total
+        })
+
+    summary_df = pd.DataFrame(summary_data)
+
+    st.dataframe(summary_df, use_container_width=True)
+
+    # STAFF COMPARISON CHART
+    st.markdown("### 📊 Staff Comparison")
+
+    fig_staff = px.bar(
+        summary_df,
+        x="Name",
+        y="Total Absence",
+        text="Total Absence",
+        color="Name"
+    )
+
+    fig_staff.update_traces(textposition="outside")
+    fig_staff.update_layout(showlegend=False)
+
+    st.plotly_chart(fig_staff, use_container_width=True)
+
+    # ==============================
     # MONTHLY (SELECTED YEAR)
     # ==============================
     st.markdown("## 📈 Monthly Overview")
@@ -184,6 +228,7 @@ with tabs[0]:
 
     fig = px.bar(monthly, x="Month_Name", y="Count", text="Count")
     fig.update_traces(textposition="outside")
+
     st.plotly_chart(fig, use_container_width=True)
 
     # ==============================
@@ -263,9 +308,7 @@ for i, person in enumerate(staff_names, start=1):
 
         st.metric("Late Count", late_count)
 
-        # ==============================
         # MONTHLY BREAKDOWN
-        # ==============================
         st.markdown("### 📈 Monthly Breakdown")
 
         monthly = (
