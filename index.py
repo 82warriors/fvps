@@ -106,7 +106,9 @@ df = df[df["Date"] >= start_date]
 
 df["Leave Type"] = df["Leave Type"].astype(str).str.strip().str.lower()
 
-# NEW: YEAR + MONTH
+# ==============================
+# DATE FEATURES
+# ==============================
 df["Year"] = df["Date"].dt.year
 df["Month"] = df["Date"].dt.month
 df["Month_Name"] = df["Date"].dt.strftime("%b")
@@ -120,7 +122,6 @@ years = sorted(df["Year"].dropna().unique(), reverse=True)
 selected_year = st.selectbox("📅 Select Year", years)
 
 df_year = df[df["Year"] == selected_year]
-
 calendar_days = df_year["Date"].nunique()
 
 # ==============================
@@ -150,7 +151,6 @@ with tabs[0]:
 
     ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(df_year)
     late_count = df_year["Leave Type"].str.contains("late", case=False).sum()
-
     absence_rate = (absence_total / max(calendar_days,1)) * 100
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -164,7 +164,7 @@ with tabs[0]:
     st.metric("Late Count", late_count)
 
     # ==============================
-    # MONTHLY SUMMARY CHART
+    # MONTHLY (SELECTED YEAR)
     # ==============================
     st.markdown("## 📈 Monthly Overview")
 
@@ -183,10 +183,59 @@ with tabs[0]:
     monthly = all_months.merge(monthly, on=["Month", "Month_Name"], how="left").fillna(0)
 
     fig = px.bar(monthly, x="Month_Name", y="Count", text="Count")
-
     fig.update_traces(textposition="outside")
-
     st.plotly_chart(fig, use_container_width=True)
+
+    # ==============================
+    # ALL YEARS OVERVIEW
+    # ==============================
+    st.markdown("## 🌍 All Years Overview")
+
+    temp_all = df.copy()
+    temp_all["YearMonth"] = temp_all["Date"].dt.to_period("M").dt.to_timestamp()
+    temp_all["YearMonth_str"] = temp_all["YearMonth"].dt.strftime("%b %Y")
+
+    all_monthly = (
+        temp_all.groupby(["YearMonth", "YearMonth_str"])
+        .size()
+        .reset_index(name="Count")
+        .sort_values("YearMonth")
+    )
+
+    fig_all = px.bar(
+        all_monthly,
+        x="YearMonth_str",
+        y="Count",
+        text="Count"
+    )
+
+    fig_all.update_traces(textposition="outside")
+    fig_all.update_layout(xaxis_tickangle=-45)
+
+    st.plotly_chart(fig_all, use_container_width=True)
+
+    # ==============================
+    # YEARLY SUMMARY
+    # ==============================
+    st.markdown("## 📊 Yearly Comparison")
+
+    yearly = (
+        df.groupby("Year")
+        .size()
+        .reset_index(name="Total Absence")
+        .sort_values("Year")
+    )
+
+    fig_year = px.bar(
+        yearly,
+        x="Year",
+        y="Total Absence",
+        text="Total Absence"
+    )
+
+    fig_year.update_traces(textposition="outside")
+
+    st.plotly_chart(fig_year, use_container_width=True)
 
 # ==============================
 # STAFF TABS
@@ -215,7 +264,7 @@ for i, person in enumerate(staff_names, start=1):
         st.metric("Late Count", late_count)
 
         # ==============================
-        # MONTHLY CHART
+        # MONTHLY BREAKDOWN
         # ==============================
         st.markdown("### 📈 Monthly Breakdown")
 
