@@ -13,12 +13,12 @@ staff1_name = "Amira"
 staff2_name = "Idham"
 
 # ==============================
-# LOGO (LOAD FIRST)
+# LOGO
 # ==============================
 logo_path = Path(__file__).parent / "logo.png"
 
 # ==============================
-# PAGE CONFIG (MUST BE FIRST ST COMMAND)
+# PAGE CONFIG
 # ==============================
 st.set_page_config(
     page_title="Attendance Tracking",
@@ -27,7 +27,7 @@ st.set_page_config(
 )
 
 # ==============================
-# HIDE STREAMLIT DEFAULT UI
+# HIDE UI
 # ==============================
 st.markdown("""
 <style>
@@ -83,7 +83,7 @@ if st.button("🔄 Refresh Now"):
 st.caption(f"Last updated: {datetime.now().strftime('%d %b %Y %H:%M:%S')}")
 
 # ==============================
-# DATA TRANSFORMATION
+# TRANSFORM DATA
 # ==============================
 df_raw = df_raw.dropna(how="all").reset_index(drop=True)
 
@@ -106,8 +106,22 @@ df = df[df["Date"] >= start_date]
 
 df["Leave Type"] = df["Leave Type"].astype(str).str.strip().str.lower()
 
+# NEW: YEAR + MONTH
+df["Year"] = df["Date"].dt.year
+df["Month"] = df["Date"].dt.month
+df["Month_Name"] = df["Date"].dt.strftime("%b")
+
 today = pd.Timestamp.today().normalize()
-calendar_days = (today - start_date).days + 1
+
+# ==============================
+# GLOBAL YEAR FILTER
+# ==============================
+years = sorted(df["Year"].dropna().unique(), reverse=True)
+selected_year = st.selectbox("📅 Select Year", years)
+
+df_year = df[df["Year"] == selected_year]
+
+calendar_days = df_year["Date"].nunique()
 
 # ==============================
 # ABSENCE FUNCTION
@@ -132,18 +146,11 @@ tabs = st.tabs(["🏠 Summary"] + [f"👤 {name}" for name in staff_names])
 # ==============================
 with tabs[0]:
 
-    st.markdown("## 🟢 Today Status")
-    today_df = df[df["Date"] == today]
+    st.markdown(f"## 📊 Summary ({selected_year})")
 
-    if today_df.empty:
-        st.success("✅ Everyone Present")
-    else:
-        st.dataframe(today_df, use_container_width=True)
+    ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(df_year)
+    late_count = df_year["Leave Type"].str.contains("late", case=False).sum()
 
-    st.markdown("## 📊 Summary")
-
-    ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(df)
-    late_count = df["Leave Type"].str.contains("late", case=False).sum()
     absence_rate = (absence_total / max(calendar_days,1)) * 100
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -157,45 +164,40 @@ with tabs[0]:
     st.metric("Late Count", late_count)
 
     # ==============================
-    # COMPARISON CHART
+    # MONTHLY SUMMARY CHART
     # ==============================
-    st.markdown("## 📊 Total Absence Comparison")
+    st.markdown("## 📈 Monthly Overview")
 
-    comparison_data = []
-    for person in staff_names:
-        person_df = df[df["Name"] == person]
-        _, _, _, _, _, total_abs = get_absence_breakdown(person_df)
-        comparison_data.append({"Name": person, "Total Absence": total_abs})
-
-    comparison_df = pd.DataFrame(comparison_data)
-
-    fig = px.bar(
-        comparison_df,
-        x="Name",
-        y="Total Absence",
-        text="Total Absence",
-        color="Name"
+    monthly = (
+        df_year.groupby(["Month", "Month_Name"])
+        .size()
+        .reset_index(name="Count")
+        .sort_values("Month")
     )
+
+    all_months = pd.DataFrame({
+        "Month": list(range(1, 13)),
+        "Month_Name": pd.date_range("2024-01-01", periods=12, freq="MS").strftime("%b")
+    })
+
+    monthly = all_months.merge(monthly, on=["Month", "Month_Name"], how="left").fillna(0)
+
+    fig = px.bar(monthly, x="Month_Name", y="Count", text="Count")
 
     fig.update_traces(textposition="outside")
-    fig.update_layout(
-        showlegend=False,
-        yaxis_title="Absences",
-        xaxis_title="Staff"
-    )
 
     st.plotly_chart(fig, use_container_width=True)
 
-# ==================================================
-# 👤 STAFF TABS
-# ==================================================
+# ==============================
+# STAFF TABS
+# ==============================
 for i, person in enumerate(staff_names, start=1):
 
     with tabs[i]:
 
-        st.markdown(f"### 👤 {person}")
+        st.markdown(f"### 👤 {person} ({selected_year})")
 
-        person_df = df[df["Name"] == person]
+        person_df = df_year[df_year["Name"] == person]
 
         ml, vl, ccl, urgent, emergency, absence_total = get_absence_breakdown(person_df)
         late_count = person_df["Leave Type"].str.contains("late", case=False).sum()
@@ -212,23 +214,26 @@ for i, person in enumerate(staff_names, start=1):
 
         st.metric("Late Count", late_count)
 
-        # Monthly Chart
-        st.markdown("### 📈 Monthly")
+        # ==============================
+        # MONTHLY CHART
+        # ==============================
+        st.markdown("### 📈 Monthly Breakdown")
 
-        temp = person_df.copy()
-        temp["Month"] = temp["Date"].dt.to_period("M").dt.to_timestamp()
+        monthly = (
+            person_df.groupby(["Month", "Month_Name"])
+            .size()
+            .reset_index(name="Count")
+            .sort_values("Month")
+        )
 
-        monthly = temp.groupby("Month").size().reset_index(name="Count")
+        monthly = all_months.merge(monthly, on=["Month", "Month_Name"], how="left").fillna(0)
 
-        full_range = pd.date_range(start=start_date, end=today, freq="MS")
-        full_df = pd.DataFrame({"Month": full_range})
-
-        monthly = full_df.merge(monthly, on="Month", how="left").fillna(0)
-        monthly["Month_str"] = monthly["Month"].dt.strftime("%b %Y")
-
-        fig = px.bar(monthly, x="Month_str", y="Count", text="Count")
+        fig = px.bar(monthly, x="Month_Name", y="Count", text="Count")
 
         fig.update_traces(textposition="outside")
-        fig.update_layout(xaxis_tickangle=-45)
+
+        fig.update_layout(
+            title=f"{person} - {selected_year} Monthly Absence"
+        )
 
         st.plotly_chart(fig, use_container_width=True)
